@@ -1,0 +1,62 @@
+# ========================
+# 🔒 Secrets
+# ========================
+.env
+.env.*
+!.env.example
+
+# ========================
+# 🐍 Python cache & artifacts
+# ========================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+*.egg
+*.bak
+*.swp
+
+# ========================
+# 📦 Virtual Environment
+# ========================
+venv/
+env/
+ENV/
+
+# ========================
+# 🗃️ Database & SQL files
+# ========================
+*.sqlite3
+*.db
+*.sql
+
+# ========================
+# 📝 Logs
+# ========================
+*.log
+pg_upgrade_*.log
+
+# ========================
+# 🧪 Flask instance folder
+# ========================
+instance/
+
+# ========================
+# 🗂️ User uploads (optional)
+# ========================
+uploads/
+
+# ========================
+# ⚙️ IDEs and editors
+# ========================
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# ========================
+# 📦 OS and misc
+# ========================
+.DS_Store
+Thumbs.db

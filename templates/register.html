@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - Virtual Interview Navigator</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+
+<header>
+    <h1>Create an Account</h1>
+</header>
+
+<main>
+    <form method="POST">
+        {{ form.hidden_tag() }}
+        <label for="username">Username</label>
+        {{ form.username(class="form-control") }}
+        <label for="email">Email</label>
+        {{ form.email(class="form-control") }}
+        <label for="password">Password</label>
+        {{ form.password(class="form-control") }}
+        <label for="confirm_password">Confirm Password</label>
+        {{ form.confirm_password(class="form-control") }}
+        {{ form.submit(class="submit") }}
+    </form>
+</main>
+
+<footer>
+    <p>&copy; 2024 Virtual Interview Navigator</p>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Performance Report - Interview Navigator</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <header>
+        <!-- <nav>
+            <ul>
+                <li><a href="{{ url_for('home') }}">Home</a></li>
+                {% if current_user.is_authenticated %}
+                    <li><a href="{{ url_for('profile') }}">Profile</a></li>
+                    <li><a href="{{ url_for('logout') }}">Logout</a></li>
+                {% else %}
+                    <li><a href="{{ url_for('login') }}">Login</a></li>
+                    <li><a href="{{ url_for('signup') }}">Sign Up</a></li>
+                {% endif %}
+            </ul>
+        </nav> -->
+        <h1>Performance Report</h1>
+    </header>
+
+    <main>
+       
+
+        <section>
+            <h2>Summary</h2>
+            <p><strong>Total Questions:</strong> {{ report.total_questions }}</p>
+            <p><strong>Answers Received:</strong> {{ report.answers_received }}</p>
+           
+        </section>
+
+        <section>
+            <h2>Detailed Responses</h2>
+            <ul>
+                {% for question, answer in report.detailed_responses %}
+                    <li>
+                        <strong>Question:</strong> {{ question }}<br>
+                        <strong>Your Answer:</strong> {{ answer }}
+                    </li>
+                {% endfor %}
+            </ul>
+        </section>
+
+        <section>
+            <h2>Personalized Feedback</h2>
+            <div class="feedback">
+                <pre>{{ feedback }}</pre>
+            </div>
+        </section>
+
+        <div>
+            <a href="{{ url_for('home') }}">Return to Home</a>
+        </div>
+    </main>
+
+    <footer>
+        <p>Interview Navigator | Your Path to Success</p>
+    </footer>
+
+    <style>
+        body {
+            height: 220vh;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f9;
+        }
+
+        header {
+            background-color: #333;
+            color: white;
+            padding: 10px 0;
+        }
+
+        header nav ul {
+            list-style: none;
+            padding: 0;
+            text-align: center;
+        }
+
+        header nav ul li {
+            display: inline;
+            margin: 0 15px;
+        }
+
+        header nav ul li a {
+            color: white;
+            text-decoration: none;
+        }
+
+        header nav ul li a:hover {
+            text-decoration: underline;
+        }
+
+        main {
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        section {
+            margin-bottom: 30px;
+        }
+
+        section h2 {
+            color: #333;
+            border-bottom: 2px solid #ddd;
+            padding-bottom: 5px;
+        }
+
+        section p, section ul {
+            font-size: 16px;
+        }
+
+        .feedback {
+            overflow: auto;
+            background-color: #f1f1f1;
+            border: 1px solid #ccc;
+            padding: 15px;
+            border-radius: 5px;
+            white-space: nowrap;
+            word-wrap: break-word;
+        }
+
+        footer {
+            background-color: #333;
+            color: white;
+            text-align: center;
+            padding: 10px;
+            position: fixed;
+            width: 100%;
+            bottom: 0;
+        }
+
+        a {
+            color: #007bff;
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</body>
+</html>
