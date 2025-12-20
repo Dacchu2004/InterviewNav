@@ -50,13 +50,25 @@ def missing_token_callback(error_string):
     logging.error(f"JWT missing token error: {error_string}")
     return jsonify({"error": "Authorization token is missing"}), 401
 
-# Enable CORS
-# Enable CORS with explicit header allowance
+# Enable CORS with strict, explicitly allowed rules
+# We rely on app.config['CORS_ORIGINS'] which defaults to localhost but receives Vercel URL in prod
 CORS(app, 
      resources={r"/api/*": {"origins": app.config['CORS_ORIGINS']}},
      supports_credentials=True,
      allow_headers=["Content-Type", "Authorization", "Access-Control-Allow-Credentials"],
      methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
+
+@app.after_request
+def add_cors_headers(response):
+    # Manual injection as a safety net for Preflight requests
+    origin = request.headers.get('Origin')
+    if origin and origin in app.config['CORS_ORIGINS']:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, Access-Control-Allow-Credentials"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+    response.headers["Access-Control-Allow-Credentials"] = "true"
+    return response
 
 # Logging configuration
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
