@@ -51,7 +51,12 @@ def missing_token_callback(error_string):
     return jsonify({"error": "Authorization token is missing"}), 401
 
 # Enable CORS
-CORS(app, origins=app.config['CORS_ORIGINS'], supports_credentials=True)
+# Enable CORS with explicit header allowance
+CORS(app, 
+     resources={r"/api/*": {"origins": app.config['CORS_ORIGINS']}},
+     supports_credentials=True,
+     allow_headers=["Content-Type", "Authorization", "Access-Control-Allow-Credentials"],
+     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
 
 # Logging configuration
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")

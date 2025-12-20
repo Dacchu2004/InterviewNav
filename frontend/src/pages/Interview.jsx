@@ -86,11 +86,18 @@ const Interview = () => {
   };
 
   const handleStartSpeaking = () => {
+    if (isListening) return; // Prevent double start
+
     if (recognitionRef.current) {
-      // Don't clear answer, allowing accumulation
-      setInterimAnswer('');
-      recognitionRef.current.start();
-      setIsListening(true);
+      try {
+        setInterimAnswer('');
+        recognitionRef.current.start();
+        setIsListening(true);
+      } catch (err) {
+        console.error("Speech start error:", err);
+        // If already started, we just ignore the error and setting state to true
+        setIsListening(true);
+      }
     } else {
       setError('Speech recognition is not supported in your browser');
     }
