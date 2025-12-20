@@ -38,5 +38,15 @@ export const interviewService = {
     const response = await api.get('/api/profile');
     return response.data;
   },
+
+  getPastReports: async () => {
+    const response = await api.get('/api/profile/reports');
+    return response.data;
+  },
+
+  getReportDetail: async (sessionId) => {
+    const response = await api.get(`/api/report/${sessionId}`);
+    return response.data;
+  },
 };
 

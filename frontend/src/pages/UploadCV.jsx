@@ -8,6 +8,7 @@ const UploadCV = () => {
     cv_file: null,
     company_name: '',
     job_role: '',
+    job_description: '',
     interview_level: 'Beginner',
   });
   const [loading, setLoading] = useState(false);
@@ -44,6 +45,7 @@ const UploadCV = () => {
       uploadFormData.append('cv_file', formData.cv_file);
       uploadFormData.append('company_name', formData.company_name);
       uploadFormData.append('job_role', formData.job_role);
+      uploadFormData.append('job_description', formData.job_description);
       uploadFormData.append('interview_level', formData.interview_level);
 
       const response = await interviewService.uploadCV(uploadFormData);
@@ -133,6 +135,24 @@ const UploadCV = () => {
                 required
                 maxLength={50}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="job_description"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
+                Job Description (Optional)
+              </label>
+              <textarea
+                id="job_description"
+                name="job_description"
+                value={formData.job_description}
+                onChange={handleChange}
+                placeholder="Paste the job description here for better personalization..."
+                rows="4"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-y"
               />
             </div>
 

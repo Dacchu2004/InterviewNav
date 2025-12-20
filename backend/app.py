@@ -1,19 +1,22 @@
 import os
 import openai
 import PyPDF2
+from datetime import datetime
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 from extensions import db, jwt
-from model import User, CV, PerformanceReport
+from extensions import db, jwt
+from model import User, CV, PerformanceReport, InterviewSession
 from docx import Document
 from flask_migrate import Migrate
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 import logging
 import uuid
 import json
+from prompts import get_interview_questions_prompt, get_feedback_prompt
 
 # Load environment variables
 load_dotenv()
@@ -54,14 +57,19 @@ CORS(app, origins=app.config['CORS_ORIGINS'], supports_credentials=True)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 # Initialize OpenAI client with timeout and retry configuration
+import httpx
+# Create a custom HTTP client that disables SSL verification
+http_client = httpx.Client(verify=False)
+
 client = openai.OpenAI(
     api_key=app.config['OPENAI_API_KEY'],
+    http_client=http_client, # Bypass SSL verification
     timeout=60.0,  # 60 second timeout
     max_retries=3  # Retry up to 3 times
 )
 
 # In-memory storage for interview sessions (in production, use Redis or database)
-interview_sessions = {}
+# Database storage for interview sessions is now used instead of in-memory dictionary
 
 # Helper Functions
 def allowed_file(filename):
@@ -84,18 +92,9 @@ def extract_text_from_cv(file_path):
         logging.error(f"Error extracting text from CV: {e}")
     return text
 
-def generate_interview_questions(cv_text, company_name, job_role, interview_level):
-    """Generate interview questions based on CV text, company, role, and level - FIXED to include CV text"""
+def generate_interview_questions(cv_text, company_name, job_role, interview_level, job_description=None):
+    """Generate interview questions based on CV text, company, role, level and optional JD"""
     
-    # FIXED: Now includes CV text in the prompt
-    base_prompt = (
-        f"Based on the following CV/resume text, generate a list of 6 to 10 personalized interview questions "
-        f"for a {job_role} position at {company_name}. "
-        f"The questions should be tailored to the candidate's specific skills, experience, and background mentioned in their CV.\n\n"
-        f"CV/RESUME TEXT:\n{cv_text}\n\n"
-        f"Generate interview questions that focus on the candidate's skills, experience, and industry knowledge mentioned in the CV above."
-    )
-
     if interview_level == 'Beginner':
         level_prompt = "The questions should focus on basic knowledge, entry-level skills, and general understanding of the field."
     elif interview_level == 'Intermediate':
@@ -105,7 +104,8 @@ def generate_interview_questions(cv_text, company_name, job_role, interview_leve
     else:
         level_prompt = "Please provide a balanced set of questions."
 
-    prompt = f"{base_prompt}\n\n{level_prompt}\n\nFormat the questions as a numbered list, one question per line."
+    # FIXED: Now includes CV text in the prompt
+    prompt = get_interview_questions_prompt(cv_text, job_role, company_name, level_prompt, job_description)
 
     try:
         response = client.chat.completions.create(
@@ -115,12 +115,12 @@ def generate_interview_questions(cv_text, company_name, job_role, interview_leve
             timeout=60.0
         )
         return response.choices[0].message.content.strip()
-    except openai.APIError as e:
-        logging.error(f"OpenAI API error generating interview questions: {e}")
-        return "Unable to generate interview questions at this time. Please check your OpenAI API key and try again later."
     except openai.APIConnectionError as e:
         logging.error(f"OpenAI connection error: {e}")
         return "Unable to connect to OpenAI service. Please check your internet connection and try again."
+    except openai.APIError as e:
+        logging.error(f"OpenAI API error generating interview questions: {e}")
+        return "Unable to generate interview questions at this time. Please check your OpenAI API key and try again later."
     except Exception as e:
         logging.error(f"Error generating interview questions: {type(e).__name__}: {e}")
         return "Unable to generate interview questions at this time. Please try again later."
@@ -129,23 +129,25 @@ def generate_personalized_feedback(responses, questions):
     """Generate personalized feedback based on user responses"""
     try:
         # Include questions in feedback generation for better context
-        feedback_prompt = (
-            "Based on the following interview questions and the candidate's responses, provide personalized and detailed feedback for improvement. "
-            "Analyze the responses and give detailed suggestions on how the candidate can improve their interview skills, including communication skills, "
-            "confidence, areas where they went wrong, and general advice for success.\n\n"
-        )
-        
-        for idx, (question, response) in enumerate(zip(questions, responses), 1):
-            feedback_prompt += f"Question {idx}: {question}\nCandidate's Answer: {response}\n\n"
+        feedback_prompt = get_feedback_prompt(questions, responses)
 
+        # Request JSON format explicitly
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": feedback_prompt}],
-            max_tokens=800,
+            response_format={ "type": "json_object" }, # Enforce JSON mode
+            max_tokens=2500,
             timeout=60.0
         )
-        feedback = response.choices[0].message.content.strip()
-        return feedback
+        content = response.choices[0].message.content.strip()
+        try:
+            return json.loads(content)
+        except json.JSONDecodeError:
+            logging.error(f"Failed to decode AI JSON feedback: {content}")
+            return {
+                "overall_feedback": "Error parsing detailed feedback. " + content,
+                "questions_analysis": []
+            }
     except openai.APIError as e:
         logging.error(f"OpenAI API error generating feedback: {e}")
         return "Unable to generate feedback at this time. Please check your OpenAI API key and try again later."
@@ -282,6 +284,7 @@ def upload_cv():
         file = request.files['cv_file']
         company_name = request.form.get('company_name')
         job_role = request.form.get('job_role')
+        job_description = request.form.get('job_description') # Optional
         interview_level = request.form.get('interview_level')
 
         if not company_name or not job_role or not interview_level:
@@ -293,19 +296,29 @@ def upload_cv():
         if not allowed_file(file.filename):
             return jsonify({"error": "Invalid file type. Please upload PDF or DOCX"}), 400
 
-        # Save file
-        filename = secure_filename(file.filename)
+        # Save file with unique name to prevent collisions
+        filename = f"{uuid.uuid4()}_{secure_filename(file.filename)}"
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(file_path)
 
         # Extract text from CV
         cv_text = extract_text_from_cv(file_path)
         if not cv_text.strip():
+            # Try to cleanup before returning error
+            try:
+                os.remove(file_path)
+            except: 
+                pass
             return jsonify({"error": "Could not extract text from CV. Please upload a valid file."}), 400
 
-        # Generate interview questions (FIXED: CV text now included)
-        questions_text = generate_interview_questions(cv_text, company_name, job_role, interview_level)
+        # Generate interview questions (includes CV text and optional JD)
+        questions_text = generate_interview_questions(cv_text, company_name, job_role, interview_level, job_description)
         if questions_text.startswith("Unable"):
+             # Try to cleanup on error
+            try:
+                os.remove(file_path)
+            except: 
+                pass
             return jsonify({"error": questions_text}), 500
 
         # Parse questions (split by newlines and filter empty lines)
@@ -315,24 +328,40 @@ def upload_cv():
 
         # Save CV to database (convert user_id to int)
         new_cv = CV(
-            file_path=file_path,
+            file_path=file_path, # Note: We keep the path in DB even if file is deleted, or we could mark it as processed
             company_name=company_name,
             job_role=job_role,
+            job_description=job_description,
             interview_level=interview_level,
             user_id=int(user_id)
         )
         db.session.add(new_cv)
         db.session.commit()
 
-        # Create interview session (store user_id as string for consistency with JWT)
+        # Create interview session in Database
         session_id = str(uuid.uuid4())
-        interview_sessions[session_id] = {
-            'user_id': str(user_id),  # Store as string to match JWT format
-            'cv_id': new_cv.id,
-            'questions': questions,
-            'responses': [],
-            'current_question': 0
-        }
+        new_session = InterviewSession(
+            id=session_id,
+            user_id=int(user_id),
+            cv_id=new_cv.id,
+            questions=questions,
+            responses=[],
+            current_question_index=0
+        )
+        db.session.add(new_session)
+        db.session.commit()
+        
+        # Cleanup: Delete the file after processing to save space
+        try:
+             # Force garbage collection if needed or just wait. 
+             # sometimes PyPDF2 keeps file open.
+             import gc
+             gc.collect()
+             if os.path.exists(file_path):
+                 os.remove(file_path)
+        except Exception as e:
+            # Log but don't fail the request
+            logging.error(f"Warning: Could not delete file {file_path}: {e}")
 
         return jsonify({
             "message": "CV uploaded successfully",
@@ -353,16 +382,17 @@ def get_current_question():
         user_id = get_jwt_identity()
         session_id = request.args.get('session_id')
 
-        if not session_id or session_id not in interview_sessions:
+        session = InterviewSession.query.get(session_id)
+        
+        if not session:
             return jsonify({"error": "Invalid or expired session"}), 404
 
-        session_data = interview_sessions[session_id]
-        # Compare as strings since both are stored as strings
-        if str(session_data['user_id']) != str(user_id):
+        # Compare user_ids
+        if session.user_id != int(user_id):
             return jsonify({"error": "Unauthorized access to session"}), 403
 
-        questions = session_data['questions']
-        current_index = session_data['current_question']
+        questions = session.questions
+        current_index = session.current_question_index
 
         if current_index >= len(questions):
             return jsonify({
@@ -390,23 +420,28 @@ def submit_answer():
         session_id = data.get('session_id')
         answer = data.get('answer')
 
-        if not session_id or session_id not in interview_sessions:
+        session = InterviewSession.query.get(session_id)
+        
+        if not session:
             return jsonify({"error": "Invalid or expired session"}), 404
 
-        session_data = interview_sessions[session_id]
-        # Compare as strings since both are stored as strings
-        if str(session_data['user_id']) != str(user_id):
+        # Compare user_ids
+        if session.user_id != int(user_id):
             return jsonify({"error": "Unauthorized access to session"}), 403
 
         if not answer or not answer.strip():
             return jsonify({"error": "Answer is required"}), 400
 
-        # Store answer
-        session_data['responses'].append(answer.strip())
-        session_data['current_question'] += 1
+        # Store answer in DB
+        current_responses = session.responses
+        current_responses.append(answer.strip())
+        session.responses = current_responses # Trigger setter
+        session.current_question_index += 1
+        
+        db.session.commit()
 
-        questions = session_data['questions']
-        current_index = session_data['current_question']
+        questions = session.questions
+        current_index = session.current_question_index
 
         if current_index >= len(questions):
             return jsonify({
@@ -433,42 +468,67 @@ def generate_report():
         data = request.get_json()
         session_id = data.get('session_id')
 
-        if not session_id or session_id not in interview_sessions:
+        session = db.session.get(InterviewSession, session_id)
+        
+        if not session:
             return jsonify({"error": "Invalid or expired session"}), 404
 
-        session_data = interview_sessions[session_id]
-        # Compare as strings since both are stored as strings
-        if str(session_data['user_id']) != str(user_id):
+        # Compare user_ids
+        if session.user_id != int(user_id):
             return jsonify({"error": "Unauthorized access to session"}), 403
 
-        questions = session_data['questions']
-        responses = session_data['responses']
-        cv_id = session_data['cv_id']
+        questions = session.questions
+        responses = session.responses
+        cv_id = session.cv_id
 
         if len(responses) != len(questions):
             return jsonify({"error": "Not all questions have been answered"}), 400
 
-        # Calculate metrics
-        accuracy_level = f"{min(100, (len(responses) / len(questions)) * 100):.2f}%"
-        confidence_level = "High" if len(responses) == len(questions) else "Moderate"
+        # Generate feedback (Returns structured dict)
+        ai_analysis = generate_personalized_feedback(responses, questions)
 
-        # Generate feedback (FIXED: Now saves to database)
-        feedback = generate_personalized_feedback(responses, questions)
+        # Handle potential error in AI response
+        if "questions_analysis" not in ai_analysis:
+            # Fallback if AI failed to return valid JSON
+            questions_analysis = []
+            overall_feedback = ai_analysis.get("overall_feedback", "Feedback generation unavailable.")
+        else:
+            questions_analysis = ai_analysis["questions_analysis"]
+            overall_feedback = ai_analysis["overall_feedback"]
 
+        # Calculate metrics based on AI scores
+        total_score = sum(q.get("score", 0) for q in questions_analysis)
+        accuracy_level = f"{(total_score / len(questions)) * 100:.2f}%"
+        confidence_level = "High" if total_score > (len(questions) * 0.7) else "Moderate"
+
+        # Update Session with results
+        # Store the FULL JSON analysis in the feedback column for retrieval
+        session.feedback = json.dumps(ai_analysis)
+        session.status = 'completed'
+        session.completed_at = datetime.utcnow()
+        
         # Create performance report
         new_report = PerformanceReport(
             accuracy_level=accuracy_level,
             confidence_level=confidence_level,
             total_questions=len(questions),
-            correct_answers=len(responses),
-            feedback=feedback,  # FIXED: Now saving feedback to database
+            correct_answers=int(total_score), # Approximate integer score
+            feedback=json.dumps(ai_analysis), # Store full JSON
             cv_id=cv_id
         )
         db.session.add(new_report)
+        
+        # REMOVED: db.session.delete(session) - We keep it for history!
+        
         db.session.commit()
 
-        # Prepare report data
-        detailed_responses = [{"question": q, "answer": r} for q, r in zip(questions, responses)]
+        # Prepare report data using the rich analysis
+        # Merge questions info with AI analysis if needed, but AI analysis has it.
+        # However, to be safe, we map by index or trust AI order.
+        # AI prompt iterates indices, so order maintains.
+        
+        detailed_responses = questions_analysis if questions_analysis else \
+            [{"question": q, "answer": r, "status": "Unknown", "score": 0, "feedback": "No detailed analysis."} for q, r in zip(questions, responses)]
         
         report_data = {
             "total_questions": len(questions),
@@ -476,11 +536,8 @@ def generate_report():
             "accuracy_level": accuracy_level,
             "confidence_level": confidence_level,
             "detailed_responses": detailed_responses,
-            "feedback": feedback
+            "feedback": overall_feedback
         }
-
-        # Clean up session
-        del interview_sessions[session_id]
 
         return jsonify({
             "message": "Report generated successfully",
@@ -499,7 +556,7 @@ def get_reports():
     try:
         user_id = get_jwt_identity()
         # Convert to int since JWT stores as string but DB uses int
-        user = User.query.get(int(user_id))
+        user = db.session.get(User, int(user_id))
         
         if not user:
             return jsonify({"error": "User not found"}), 404
@@ -518,6 +575,112 @@ def get_reports():
     except Exception as e:
         logging.error(f"Get reports error: {e}")
         return jsonify({"error": "Failed to fetch reports"}), 500
+@app.route('/api/profile/reports', methods=['GET'])
+@jwt_required()
+def get_past_reports():
+    try:
+        user_id = get_jwt_identity()
+        # Fetch completed sessions (reports)
+        # Ordered by completed_at desc
+        sessions = InterviewSession.query.filter_by(
+            user_id=int(user_id), 
+            status='completed'
+        ).order_by(InterviewSession.completed_at.desc()).all()
+        
+        reports_list = []
+        for s in sessions:
+            cv = CV.query.get(s.cv_id)
+            # Calculate actual score from AI analysis if available
+            score_display = f"{len(s.responses)}/{len(s.questions)}" # Default
+            try:
+                if s.feedback and (s.feedback.startswith('{') or s.feedback.startswith('[')):
+                    analysis = json.loads(s.feedback)
+                    if isinstance(analysis, dict) and "questions_analysis" in analysis:
+                        total_score = sum(q.get("score", 0) for q in analysis["questions_analysis"])
+                        # Format score to 2 decimal places if float, or int if whole number
+                        formatted_score = f"{total_score:.2f}".rstrip('0').rstrip('.')
+                        score_display = f"{formatted_score}/{len(s.questions)}"
+            except Exception:
+                pass # Fallback to count
+
+            reports_list.append({
+                'session_id': s.id,
+                'cv_company': cv.company_name if cv else "Unknown",
+                'cv_role': cv.job_role if cv else "Unknown",
+                'interview_level': cv.interview_level if cv else "",
+                'completed_at': s.completed_at.strftime('%Y-%m-%d %H:%M') if s.completed_at else "",
+                'score': score_display
+            })
+            
+        return jsonify(reports_list), 200
+    except Exception as e:
+        logging.error(f"Get reports error: {e}")
+        return jsonify({"error": "Failed to load reports"}), 500
+
+@app.route('/api/report/<session_id>', methods=['GET'])
+@jwt_required()
+def get_report_detail(session_id):
+    try:
+        user_id = get_jwt_identity()
+        session = db.session.get(InterviewSession, session_id)
+        
+        if not session:
+            return jsonify({"error": "Report not found"}), 404
+            
+        if session.user_id != int(user_id):
+            return jsonify({"error": "Unauthorized"}), 403
+            
+        if session.status != 'completed':
+            return jsonify({"error": "Interview not completed yet"}), 400
+
+        # Reconstruct report structure
+        questions = session.questions
+        responses = session.responses
+        
+        # Parse feedback
+        feedback_raw = session.feedback
+        overall_feedback = ""
+        questions_analysis = []
+        
+        try:
+            if feedback_raw and (feedback_raw.startswith('{') or feedback_raw.startswith('[')):
+                 ai_analysis = json.loads(feedback_raw)
+                 if isinstance(ai_analysis, dict):
+                    overall_feedback = ai_analysis.get("overall_feedback", "")
+                    questions_analysis = ai_analysis.get("questions_analysis", [])
+                 else:
+                     overall_feedback = str(feedback_raw) # Fallback
+            else:
+                 overall_feedback = feedback_raw or "No feedback available."
+        except Exception as e:
+            logging.warning(f"Failed to parse feedback JSON: {e}")
+            overall_feedback = feedback_raw
+
+        # If we have structured analysis, use it. Otherwise fallback to simple pairing
+        if questions_analysis:
+             detailed_responses = questions_analysis
+             # Recalculate score from analysis data for consistency
+             total_score = sum(q.get("score", 0) for q in questions_analysis)
+             accuracy_level = f"{(total_score / len(questions)) * 100:.2f}%"
+             confidence_level = "High" if total_score > (len(questions) * 0.7) else "Moderate"
+        else:
+             detailed_responses = [{"question": q, "answer": r, "status": "Unknown", "score": 0, "feedback": "Detailed analysis unavailable for this old session."} for q, r in zip(questions, responses)]
+             accuracy_level = f"{min(100, (len(responses) / len(questions)) * 100):.2f}%"
+             confidence_level = "High" if len(responses) == len(questions) else "Moderate"
+
+        report_data = {
+            "total_questions": len(questions),
+            "answers_received": len(responses),
+            "accuracy_level": accuracy_level,
+            "confidence_level": confidence_level,
+            "detailed_responses": detailed_responses,
+            "feedback": overall_feedback
+        }
+        
+        return jsonify({"report": report_data}), 200
+    except Exception as e:
+        logging.error(f"Get report detail error: {e}")
+        return jsonify({"error": "Failed to load report"}), 500
 
 if __name__ == '__main__':
     with app.app_context():

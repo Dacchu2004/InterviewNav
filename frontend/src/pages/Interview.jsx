@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { interviewService } from '../services/interviewService';
 import { SpeechRecognitionHelper, speakText } from '../utils/speechRecognition';
 
+import { toast } from 'react-hot-toast';
+
 const Interview = () => {
   const navigate = useNavigate();
   const [sessionId, setSessionId] = useState(null);
@@ -30,17 +32,30 @@ const Interview = () => {
 
     // Initialize speech recognition
     try {
+      if (!window.SpeechRecognition && !window.webkitSpeechRecognition) {
+         toast.error("Your browser does not support Speech Recognition. Please use Chrome or Edge.", {
+             duration: 5000,
+             icon: '⚠️'
+         });
+         setError('Speech recognition is not supported in this browser. Please use Google Chrome or Microsoft Edge.');
+      }
+
       recognitionRef.current = new SpeechRecognitionHelper();
-      recognitionRef.current.setOnResult((final, interim) => {
-        setAnswer(final);
-        setInterimAnswer(interim);
+      recognitionRef.current.setOnResult((newFinal, newInterim) => {
+        if (newFinal) {
+            setAnswer(prev => {
+                const prefix = prev && !prev.endsWith(' ') ? ' ' : '';
+                return prev + prefix + newFinal;
+            });
+        }
+        setInterimAnswer(newInterim);
       });
       recognitionRef.current.setOnError((error) => {
         console.error('Speech recognition error:', error);
         setIsListening(false);
       });
     } catch (err) {
-      console.error('Speech recognition not supported:', err);
+      console.error('Speech recognition initialization failed:', err);
     }
 
     return () => {
@@ -72,7 +87,7 @@ const Interview = () => {
 
   const handleStartSpeaking = () => {
     if (recognitionRef.current) {
-      setAnswer('');
+      // Don't clear answer, allowing accumulation
       setInterimAnswer('');
       recognitionRef.current.start();
       setIsListening(true);
@@ -166,13 +181,18 @@ const Interview = () => {
 
           <div className="mb-6">
             <h3 className="text-lg font-medium text-gray-700 mb-2">Your Answer:</h3>
-            <div className="min-h-[150px] p-4 border border-gray-300 rounded-lg bg-gray-50">
-              <p className="text-gray-800 whitespace-pre-wrap">
-                {answer}
-                <span className="text-gray-500">{interimAnswer}</span>
-              </p>
-              {!answer && !interimAnswer && (
-                <p className="text-gray-400 italic">Your transcribed answer will appear here...</p>
+            <div className="relative">
+              <textarea
+                value={answer}
+                onChange={(e) => setAnswer(e.target.value)}
+                placeholder="Type your answer here or use the microphone..."
+                rows="6"
+                className="w-full p-4 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-y"
+              />
+              {interimAnswer && (
+                <div className="absolute bottom-4 left-4 right-4 bg-white/90 p-2 rounded shadow-sm border border-gray-200 text-gray-600 italic text-sm pointer-events-none">
+                  Listening: {interimAnswer}
+                </div>
               )}
             </div>
           </div>

@@ -1,32 +1,56 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import Navbar from './components/Navbar';
-import ProtectedRoute from './components/ProtectedRoute';
-import Home from './pages/Home';
-import Login from './pages/Login';
-import Signup from './pages/Signup';
-import Profile from './pages/Profile';
-import UploadCV from './pages/UploadCV';
-import Interview from './pages/Interview';
-import Report from './pages/Report';
-import { authService } from './services/authService';
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
+import Navbar from "./components/Navbar";
+import ProtectedRoute from "./components/ProtectedRoute";
+import Home from "./pages/Home";
+import Login from "./pages/Login";
+import Signup from "./pages/Signup";
+import Profile from "./pages/Profile";
+import UploadCV from "./pages/UploadCV";
+import Interview from "./pages/Interview";
+import Report from "./pages/Report";
+import { authService } from "./services/authService";
+import { Toaster } from 'react-hot-toast';
 
 function App() {
   return (
     <Router>
+      <Toaster position="top-right" />
       <div className="min-h-screen bg-gray-50">
         <Navbar />
         <Routes>
-          <Route path="/" element={<Home />} />
+          <Route 
+            path="/" 
+            element={
+              authService.isAuthenticated() ? (
+                <Navigate to="/profile" replace />
+              ) : (
+                <Home /> 
+              )
+            } 
+          />
           <Route
             path="/login"
             element={
-              authService.isAuthenticated() ? <Navigate to="/profile" replace /> : <Login />
+              authService.isAuthenticated() ? (
+                <Navigate to="/profile" replace />
+              ) : (
+                <Login />
+              )
             }
           />
           <Route
             path="/signup"
             element={
-              authService.isAuthenticated() ? <Navigate to="/profile" replace /> : <Signup />
+              authService.isAuthenticated() ? (
+                <Navigate to="/profile" replace />
+              ) : (
+                <Signup />
+              )
             }
           />
           <Route
@@ -61,6 +85,14 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/report/:sessionId"
+            element={
+              <ProtectedRoute>
+                <Report />
+              </ProtectedRoute>
+            }
+          />
         </Routes>
       </div>
     </Router>
@@ -68,4 +100,3 @@ function App() {
 }
 
 export default App;
-
