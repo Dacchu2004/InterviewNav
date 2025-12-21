@@ -1,182 +1,122 @@
-# Virtual Interview Navigator
+# Virtual Interview Navigator – AI Interview System
 
-AI-powered virtual interviewer system that generates personalized interview questions based on your CV and provides real-time feedback.
+**Virtual Interview Navigator** is an AI-powered full-stack application designed to simulate real-world technical interviews. It generates personalized interview questions based on the candidate's CV, Job Role, and Job Description, and provides comprehensive, structured feedback on performance.
 
-## Tech Stack
+![Project Status](https://img.shields.io/badge/Status-Live-success)
+![Tech Stack](<https://img.shields.io/badge/Stack-MERN%20(Python%2FReact)-blue>)
 
-### Backend
-- **Python Flask** - Web framework
-- **PostgreSQL** - Database
-- **SQLAlchemy** - ORM
-- **Flask-JWT-Extended** - JWT authentication
-- **OpenAI GPT-4o-mini** - AI question generation and feedback
-- **PyPDF2 & python-docx** - CV text extraction
+## 🚀 Key Features
+
+### 🧠 Intelligent Orchestration
+
+- **End-to-End Request Pipeline**: Validates, persists, and processes interview context (CV, Role, JD) to generate highly relevant questions.
+- **RAG-Lite Personalization**: Uses "Retrieval-Augmented Generation" principles to tailor prompts based on uploaded documents.
+
+### 🎙️ Interactive Interface
+
+- **Voice-Enabled**: Integrated **Browser Speech Recognition** allows candidates to speak their answers hands-free.
+- **Real-Time Responsiveness**: Mobile-friendly, adaptive UI centered around user experience.
+
+### 📊 Comprehensive Feedback System
+
+- **Detailed Scoring**: Assigns weighted scores (0-1.0) per question based on relevance and correctness.
+- **Structured Analysis**: Generates rich **Markdown reports** analyzing:
+  - **Communication Skills**
+  - **Confidence**
+  - **Technical Accuracy**
+  - **Areas for Improvement**
+- **Visual Badges**: Instant "Correct", "Partial", or "Wrong" status indicators.
+
+### 🏗️ Robust Architecture
+
+- **Stateless Backend**: Flask REST API with JWT-based authentication and PostgreSQL persistence.
+- **Document Ingestion**: Robust `PyPDF2` and `python-docx` pipelines for text extraction.
+- **AI Integration Layer**: Isolated service layer ensuring clean separation between business logic and LLM inference.
+
+---
+
+## 🛠️ Tech Stack
 
 ### Frontend
-- **React** - UI library
-- **Vite** - Build tool
-- **Tailwind CSS** - Styling
-- **Axios** - HTTP client
-- **Web Speech API** - Voice recognition
 
-## Project Structure
+- **React.js (Vite)**: High-performance UI library.
+- **Tailwind CSS**: Utility-first styling for responsive design.
+- **Web Speech API**: Native browser speech recognition.
+- **React Markdown**: Rich text rendering for AI reports.
+- **Axios**: HTTP client with interceptors for JWT handling.
 
-```
-InterviewPrac/
-├── backend/           # Flask API
-│   ├── app.py
-│   ├── model.py
-│   ├── config.py
-│   ├── extensions.py
-│   ├── requirements.txt
-│   ├── migrations/
-│   └── uploads/
-│
-└── frontend/          # React App
-    ├── src/
-    │   ├── components/
-    │   ├── pages/
-    │   ├── services/
-    │   └── utils/
-    ├── package.json
-    └── vite.config.js
-```
+### Backend
 
-## Setup Instructions
+- **Python Flask**: Lightweight, extensible web framework.
+- **PostgreSQL (Neon DB)**: Relational database for persistent storage.
+- **SQLAlchemy ORM**: Database abstraction layer.
+- **OpenAI GPT-4o**: Large Language Model for inference.
+- **PyPDF2 / python-docx**: Document processing.
+
+### Infrastructure
+
+- **Render**: Backend container orchestration.
+- **Vercel**: Frontend edge deployment.
+- **Neon**: Serverless PostgreSQL.
+
+---
+
+## 🔧 Local Setup
 
 ### Prerequisites
-1. Python 3.11+
-2. Node.js 18+
-3. PostgreSQL installed and running
 
-### Step 1: Database Setup
+- Python 3.11+
+- Node.js 18+
+- PostgreSQL
 
-1. Open PostgreSQL command line or pgAdmin
-2. Connect to PostgreSQL
-3. Create the database:
-   ```sql
-   CREATE DATABASE "InterviewNavigator";
-   ```
-4. Note: Database name must be exactly `InterviewNavigator` (case-sensitive)
+### 1. Database
 
-### Step 2: Backend Setup
+Create a database named `InterviewNavigator`.
 
-1. Navigate to backend directory:
-   ```bash
-   cd backend
-   ```
+```sql
+CREATE DATABASE "InterviewNavigator";
+```
 
-2. Create virtual environment:
-   ```bash
-   python -m venv venv
-   ```
+### 2. Backend
 
-3. Activate virtual environment:
-   ```bash
-   # Windows
-   venv\Scripts\activate
-   
-   # Mac/Linux
-   source venv/bin/activate
-   ```
+```bash
+cd backend
+python -m venv venv
+# Windows: venv\Scripts\activate | Mac/Linux: source venv/bin/activate
+pip install -r requirements.txt
+flask db upgrade
+python app.py
+```
 
-4. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+_Note: Ensure `.env` is configured with `DATABASE_URL` and `OPENAI_API_KEY`._
 
-5. Create `.env` file in backend directory:
-   ```env
-   DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@localhost:5432/InterviewNavigator?schema=public
-   JWT_SECRET=your-jwt-secret-key
-   OPENAI_API_KEY=your-openai-api-key
-   SECRET_KEY=your-flask-secret-key
-   CORS_ORIGINS=http://localhost:5173,http://localhost:3000
-   ```
+### 3. Frontend
 
-6. Run database migrations:
-   ```bash
-   flask db upgrade
-   ```
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-7. Start the backend server:
-   ```bash
-   python app.py
-   ```
+_Note: Ensure `.env` has `VITE_API_URL=http://localhost:5000` locally._
 
-   Backend runs on `http://localhost:5000`
+---
 
-### Step 3: Frontend Setup
-
-1. Navigate to frontend directory:
-   ```bash
-   cd frontend
-   ```
-
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-3. Create `.env` file in frontend directory:
-   ```env
-   VITE_API_URL=http://localhost:5000
-   ```
-
-4. Start the development server:
-   ```bash
-   npm run dev
-   ```
-
-   Frontend runs on `http://localhost:5173`
-
-## Key Features
-
-✅ **CV-Based Question Generation** - Questions are personalized based on your CV content  
-✅ **Voice Input** - Answer questions using speech recognition  
-✅ **Real-time Feedback** - Get AI-powered feedback on your responses  
-✅ **Performance Tracking** - View your interview performance reports  
-✅ **Multi-level Interviews** - Beginner, Intermediate, and Advanced levels  
-
-## API Endpoints
-
-- `POST /api/register` - User registration
-- `POST /api/login` - User login
-- `GET /api/profile` - Get user profile
-- `POST /api/upload-cv` - Upload CV and generate questions
-- `GET /api/interview/question` - Get current interview question
-- `POST /api/interview/answer` - Submit answer
-- `POST /api/report/generate` - Generate performance report
-- `GET /api/reports` - Get all reports
-
-## Deployment
+## 🚀 Deployment Guide
 
 ### Backend (Render)
-1. Connect GitHub repository
-2. Set root directory: `backend`
-3. Build command: `pip install -r requirements.txt`
-4. Start command: `gunicorn app:app`
-5. Add environment variables in Render dashboard
 
-### Database (Neon)
-1. Create project on Neon.tech
-2. Get connection string
-3. Update `DATABASE_URL` in Render environment variables
+1.  **Build Command**: `./build.sh` (Installs deps + runs DB migrations).
+2.  **Start Command**: `gunicorn app:app --timeout 300` (Increased timeout for long AI generation).
+3.  **Env Vars**: `DATABASE_URL` (Neon), `OPENAI_API_KEY`, `CORS_ORIGINS` (Vercel URL).
 
 ### Frontend (Vercel)
-1. Connect GitHub repository
-2. Set root directory: `frontend`
-3. Build command: `npm run build`
-4. Output directory: `dist`
-5. Add environment variable: `VITE_API_URL` (your Render backend URL)
 
-## Notes
+1.  **Framework**: React (Vite).
+2.  **Env Vars**: `VITE_API_URL` (Your Render Backend URL, no trailing slash).
 
-- Speech recognition requires a browser that supports Web Speech API (Chrome, Edge)
-- CV files should be PDF or DOCX format
-- OpenAI API key is required for question generation and feedback
+---
 
-## License
+## 🛡️ License
 
-MIT
-
+MIT License.
