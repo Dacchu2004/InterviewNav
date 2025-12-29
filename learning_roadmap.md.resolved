@@ -1,0 +1,165 @@
+# InterviewNav Master Roadmap (Zero-to-Architect)
+
+This roadmap is designed to take you from "I built this with AI" to "I engineered this system". It matches your request to combine **Language/Framework Basics** with **Engineering Architecture**, specifically pointing to _your_ code.
+
+---
+
+# 🏗️ Phase 1: The Syntax Foundation (Languages & Tools)
+
+_Goal: Understand the specific syntax/keywords used in this project._
+
+## 1️⃣ JavaScript / React (The Frontend)
+
+### 🔍 What to learn
+
+- **Async / Await**: Pausing execution until a Promise resolves (API call).
+- **Hooks (`useState`, `useEffect`, `useRef`)**: Managing memory and side-effects.
+- **FormData**: Sending files to the server.
+- **Event Handling**: `onClick`, `onChange`.
+- **Promise.all**: Running multiple API calls at the same time.
+
+### 📌 Why this matters (In Your Project)
+
+- **Async/Await**: Used in [Interview.jsx](file:///d:/PRO/InterviewPrac/frontend/src/pages/Interview.jsx#L113) ([handleSubmit](file:///d:/PRO/InterviewPrac/frontend/src/pages/Login.jsx#22-36)) to wait for the user's answer to be submitted to the backend.
+- **useEffect**: Used in [Report.jsx](file:///d:/PRO/InterviewPrac/frontend/src/pages/Report.jsx#L13) to automatically fetch the report when the page loads.
+- **useRef**: Used in [Interview.jsx](file:///d:/PRO/InterviewPrac/frontend/src/pages/Interview.jsx#L43) to store the [SpeechRecognition](file:///d:/PRO/InterviewPrac/frontend/src/utils/speechRecognition.js#2-76) instance so it persists between renders without causing re-renders.
+- **FormData**: Used in [UploadCV.jsx](file:///d:/PRO/InterviewPrac/frontend/src/pages/UploadCV.jsx#L44) to bundle the PDF file + Company Name + Job Role into a single HTTP request.
+- **Promise.all**: Used in [Profile.jsx](file:///d:/PRO/InterviewPrac/frontend/src/pages/Profile.jsx#L17) to fetch the User's Profile AND their Past Reports in parallel, making the page load twice as fast.
+
+### ❌ What to SKIP
+
+- **Class Components**: You use Functional Components only.
+- **Redux**: You use local state (`useState`) and `sessionStorage`.
+- **Next.js Server Actions**: You are using Vite (Client-side React).
+
+---
+
+## 2️⃣ Python / Flask (The Backend)
+
+### 🔍 What to learn
+
+- **Decorators (`@app.route`, `@jwt_required`)**: Functions that wrap other functions to add magic (Routing, Security).
+- **SQLAlchemy Models**: Defining database tables as Python Classes.
+- **List Comprehensions**: `[x for x in list if condition]`.
+- **Exception Handling (`try/except`)**: catching errors gracefully.
+
+### 📌 Why this matters (In Your Project)
+
+- **Decorators**: [app.py](file:///d:/PRO/InterviewPrac/backend/app.py#L396) uses `@jwt_required()` to protect the interview questions route. If a user isn't logged in, this function blocks them.
+- **Models**: [model.py](file:///d:/PRO/InterviewPrac/backend/model.py#L28) defines the [CV](file:///d:/PRO/InterviewPrac/backend/model.py#28-54) table. You don't write SQL `CREATE TABLE`; Python does it for you.
+- **List Comprehensions**: [app.py](file:///d:/PRO/InterviewPrac/backend/app.py#L342) uses `[q.strip() for q in questions_text.split('\n')]` to clean up the raw text from OpenAI into a clean list of questions.
+- **Try/Except**: Every route in [app.py](file:///d:/PRO/InterviewPrac/backend/app.py) is wrapped in this to prevent the server from crashing if OpenAI fails.
+
+---
+
+# 🚀 Phase 2: The Architecture (Engineer Mode)
+
+_Goal: Understand the "Why" and "How" of the system design to ace the interview._
+
+## 1️⃣ Stateless Authentication (JWT)
+
+### 🔍 What you must understand
+
+- **Session vs Token**: Why we don't store "logged in users" in server memory.
+- **The "Bearer" Token**: The VIP ticket.
+- **Interceptors**: The automatic stamp on the envelope.
+
+### 📌 Why this matters
+
+You implemented **Stateless Auth**.
+
+1.  **Login**: User logs in, gets a `access_token` string ([app.py](file:///d:/PRO/InterviewPrac/backend/app.py#L256)).
+2.  **Storage**: Frontend puts it in `localStorage`.
+3.  **Transport**: [api.js](file:///d:/PRO/InterviewPrac/frontend/src/services/api.js#L11-L26) has an **Interceptor**. It _intercepts_ every single request you make (like "Get Questions") and secretly staples `Authorization: Bearer <token>` to the header.
+4.  **Verification**: The Backend (`@jwt_required`) checks the signature. If valid, it knows who you are (`get_jwt_identity()`).
+
+### ✅ Output skill
+
+> "I implemented **JWT-based stateless authentication** with **Axios Interceptors** to ensure secure, scalable communication between the React frontend and Flask backend."
+
+## 2️⃣ The "Prompt Engineering" Pipeline
+
+### 🔍 What you must understand
+
+- **Context Injection**: Giving the AI the "Facts" before asking the "Question".
+- **Structured Output**: Forcing the AI to speak JSON.
+- **Temperature/Parameters**: Controlling creativity.
+
+### 📌 Why this matters
+
+Your app isn't just "calling ChatGPT". You built a pipeline.
+
+1.  **Extraction**: [app.py](file:///d:/PRO/InterviewPrac/backend/app.py#L95) rips text out of PDFs.
+2.  **Injection**: [prompts.py](file:///d:/PRO/InterviewPrac/backend/prompts.py#L2) takes that raw text and injects it into a carefully crafted template: _"Based on the following CV... generate questions..."_.
+3.  **JSON Enforcement**: In [app.py](file:///d:/PRO/InterviewPrac/backend/app.py#L155), you call OpenAI with `response_format={ "type": "json_object" }`. This guarantees the feedback comes back as computer-readable data, not just a paragraph of text.
+
+### ✅ Output skill
+
+> "I designed a **Context-Aware Prompt Pipeline** that extracts unstructured data from PDFs and utilizes **JSON Mode** in GPT-4o to generate structured, programmatic feedback for the application layer."
+
+## 3️⃣ Speech-to-Text Integration
+
+### 🔍 What you must understand
+
+- **Web Speech API**: The browser's built-in ear.
+- **Real-time Feedback**: Showing text _as you speak_.
+
+### 📌 Why this matters
+
+Check [Interview.jsx](file:///d:/PRO/InterviewPrac/frontend/src/pages/Interview.jsx#L43).
+You didn't use a heavy external library. You used the native `window.SpeechRecognition`.
+
+- **Ref Pattern**: You used `useRef` for the recognition engine. Why? Because if you stored it in `useState`, the component would re-render 100 times a second while you talk, crashing the app. `useRef` keeps it stable.
+
+### ✅ Output skill
+
+> "I integrated the **Web Speech API** using a custom **Class-based Wrapper Service** ([SpeechRecognitionHelper](file:///d:/PRO/InterviewPrac/frontend/src/utils/speechRecognition.js#2-76)) to abstract browser-specific vendor prefixes and manage event listeners cleanly."
+
+---
+
+# 📅 Pre-Learning Checklist & Resources
+
+## Week 1: The Basics (Frontend Focus)
+
+- [ ] **React Hooks**: Learn `useState` and `useEffect`.
+  - _Resource_: "React Hooks in 10 Minutes" (YouTube).
+  - _Practice_: Read [Report.jsx](file:///d:/PRO/InterviewPrac/frontend/src/pages/Report.jsx) and trace how `setReport` saves the data.
+- [ ] **HTTP & APIs**: Learn what GET/POST/PUT mean.
+  - _Resource_: "REST APIs for Beginners".
+  - _Practice_: Look at `api/login` vs `api/profile` in [app.py](file:///d:/PRO/InterviewPrac/backend/app.py).
+
+## Week 2: The Backend & Data
+
+- [ ] **Python Decorators**: Understand the `@` symbol.
+  - _Resource_: "Primer on Python Decorators" (Real Python).
+  - _Practice_: Remove `@jwt_required` from a route and see if you can access it without logging in.
+- [ ] **Database Relationships**: One-to-Many ([User](file:///d:/PRO/InterviewPrac/backend/model.py#5-27) -> `CVs`).
+  - _Resource_: "SQLAlchemy Relationships".
+  - _Practice_: Look at [model.py](file:///d:/PRO/InterviewPrac/backend/model.py) line 13: `db.relationship`.
+
+## Week 3: The AI & Architecture
+
+- [ ] **Prompt Engineering**: Zero-shot vs Few-shot.
+  - _Resource_: "OpenAI Prompt Engineering Guide".
+  - _Practice_: Edit [prompts.py](file:///d:/PRO/InterviewPrac/backend/prompts.py) and change the system instructions. See how the questions change.
+- [ ] **JWT Auth Flow**:
+  - _Resource_: "JWT Authentication Explained" (Video).
+  - _Practice_: Use the "Application" tab in Chrome DevTools to delete your token and watch the app kick you out.
+
+---
+
+# 🎤 Interview "Elevator Pitch"
+
+**Interviewer**: "Tell me about this project."
+
+**You**:
+"InterviewNav is an AI-powered mock interview platform I architected to help candidates practice.
+I built it using a **React** frontend and **Flask** backend.
+Unlike simple wrappers, I implemented a robust pipeline that:
+
+1.  **Parses PDF/Docx resumes** to extract raw text context.
+2.  Uses **GDP-4o with Context Injection** to generate role-specific questions.
+3.  Features a **Voice-enabled interface** using the Web Speech API for a realistic interview simulation.
+4.  Delivers **Structured JSON feedback** by enforcing strict schema outputs from the LLM.
+
+I also handled security using **JWT stateless authentication** with custom Axios interceptors to manage session lifecycles automatically."

@@ -11,6 +11,10 @@ class Config:
     # PostgreSQL defaults to 'public' schema automatically
     SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL', 'postgresql://postgres:password@localhost:5432/InterviewNavigator')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        "pool_pre_ping": True,
+        "pool_recycle": 300,
+    }
     UPLOAD_FOLDER = os.path.join(os.getcwd(), 'uploads')
     ALLOWED_EXTENSIONS = {'pdf', 'docx'}
     JWT_ACCESS_TOKEN_EXPIRES = False  # Tokens don't expire (or set to timedelta(hours=24))
